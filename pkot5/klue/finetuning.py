@@ -21,7 +21,7 @@ from transformers import (
 
 from .args import get_config
 from .collators import DistributedSamplerForEval
-from .processors import KLUE_PROCESSORS, Text2TextDataset
+from .processors import KLUE_PROCESSORS, Text2TextDataset, VincaProcessor
 
 
 class Metrics(TrainerCallback):
@@ -92,7 +92,10 @@ def train(model="./models/t5-kr-small-bbpe", task='ynat', max_length=1300):
     tokenizer = PreTrainedTokenizerFast.from_pretrained(model_name_or_path)
     model = T5ForConditionalGeneration.from_pretrained(model_name_or_path)
 
-    processor = KLUE_PROCESSORS[task](tokenizer)
+    if task == "vinca":
+        processor = VincaProcessor(tokenizer)
+    else:
+        processor = KLUE_PROCESSORS[task](tokenizer)
 
     train_data = Text2TextDataset(processor.process('train'), max_length=max_length)
     dev_data = Text2TextDataset(processor.process('validation'), max_length=max_length)

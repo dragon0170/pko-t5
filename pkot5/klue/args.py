@@ -157,6 +157,7 @@ CONFIGS = {
     'mrc': MRC_ALL_CONTEXT_CONFIG,
     'dp': DP_CONFIG,
     'multitask': MULTITASK_CONFIG_1,
+    'vinca': MRC_ALL_CONTEXT_CONFIG,
 }
 
 

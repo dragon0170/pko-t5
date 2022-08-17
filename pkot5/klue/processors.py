@@ -7,9 +7,80 @@ import torch
 from sklearn.metrics import f1_score, accuracy_score
 from scipy.stats import pearsonr
 import datasets
+import json
 from transformers import BatchEncoding, T5ForConditionalGeneration
 
 from .utils import contains_as_sublist
+
+
+class VincaProcessor:
+    def __init__(self, tokenizer):
+        file_path = "vinca_place_dataset_220811.json"
+
+        with open(file_path, 'r') as file:
+            data = json.load(file)
+            print("dataset version: ", data["version"])
+            print("dataset length: ", len(data["data"]))
+        self.data = data["data"]
+        self.tokenizer = tokenizer
+        self.squad_metric = datasets.load_metric('squad')
+
+    @property
+    def task(self):
+        return 'vinca'
+
+    def process(self, split_name):
+        dataset = []
+        if split_name == "train":
+            dataset = self.data[:-10]
+        if split_name == "validation":
+            dataset = self.data[-10:]
+
+        input_texts, target_texts = self._process_t2t(dataset)
+        input_ids = self.tokenizer(input_texts, add_special_tokens=True).input_ids
+        # overflow_context_count = 0
+        # for input_id in input_ids:
+        #     if len(input_id) > 1300:
+        #         overflow_context_count += 1
+        # print(split_name, overflow_context_count, len(input_ids))
+        label_ids = self.tokenizer(target_texts, add_special_tokens=True).input_ids
+
+        assert len(input_ids) == len(dataset), f"{len(input_ids)} == {len(dataset)}"
+        assert len(label_ids) == len(dataset)
+
+        return [
+            dict(input_ids=input_ids[i], label_ids=label_ids[i], _input_text=input_texts[i], _target_text=target_texts[i], **row)
+            for i, row in enumerate(dataset)
+            if input_texts[i] != "" and target_texts[i] != ""
+        ]
+
+    def compute_metrics(self, output_ids, entries, **kwargs):
+        output_texts = self.tokenizer.batch_decode(output_ids, skip_special_tokens=True)
+        return self._compute_metrics(output_texts, entries)
+
+    def _process_t2t(self, dataset) -> Tuple[List[str], List[str]]:
+        input_texts, target_texts = [], []
+        for row in dataset:
+            context = row['paragraphs'][0]['context']
+            question = row['paragraphs'][0]['qas'][0]['question']
+            answers = row['paragraphs'][0]['qas'][0]['answers']
+            assert len(answers) > 0
+
+            input_texts.append(f"vinca question: {question} context: {context}")
+            target_texts.append(f"{answers[-1]['text']}")
+        assert len(input_texts) == len(dataset)
+        assert len(target_texts) == len(dataset)
+        return input_texts, target_texts
+
+    @torch.no_grad()
+    def _compute_metrics(self, output_texts: List[str], entries: List[Dict[str, any]]) -> Dict[str, float]:
+        references, predictions = [], []
+        for output_text, row in zip(output_texts, entries):
+            predictions.append({'prediction_text': output_text, 'id': row['paragraphs'][0]['qas'][0]['id']})
+            references.append({'answers': {"text": [answer["text"] for answer in row['paragraphs'][0]['qas'][0]['answers']]}, 'id': row['paragraphs'][0]['qas'][0]['id']})
+        results = self.squad_metric.compute(predictions=predictions, references=references)
+
+        return {"exact_match": results['exact_match'], 'f1': results['f1']}
 
 
 class KlueProcessor(metaclass=ABCMeta):
