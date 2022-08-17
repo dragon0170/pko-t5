@@ -77,7 +77,7 @@ class VincaProcessor:
         references, predictions = [], []
         for output_text, row in zip(output_texts, entries):
             predictions.append({'prediction_text': output_text, 'id': row['paragraphs'][0]['qas'][0]['id']})
-            references.append({'answers': {"text": [answer["text"] for answer in row['paragraphs'][0]['qas'][0]['answers']]}, 'id': row['paragraphs'][0]['qas'][0]['id']})
+            references.append({'answers': {"answer_start": [0], "text": [answer["text"] for answer in row['paragraphs'][0]['qas'][0]['answers']]}, 'id': row['paragraphs'][0]['qas'][0]['id']})
         results = self.squad_metric.compute(predictions=predictions, references=references)
 
         return {"exact_match": results['exact_match'], 'f1': results['f1']}
