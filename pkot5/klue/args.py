@@ -96,6 +96,24 @@ MRC_ALL_CONTEXT_CONFIG = dict(
     save_strategy=IntervalStrategy.NO,
 )
 
+VINCA_CONFIG = dict(
+    seed=42,
+    learning_rate=5e-4,
+    warmup_ratio=0.02,
+    optim="adafactor",
+    num_train_epochs=10,
+    per_device_train_batch_size=8,
+    per_device_eval_batch_size=4,
+    gradient_accumulation_steps=4,
+
+    generation_max_length=64,
+    generation_num_beams=2,
+
+    evaluation_strategy=IntervalStrategy.EPOCH,
+    # eval_steps=10,
+    save_strategy=IntervalStrategy.NO,
+)
+
 DP_CONFIG = dict(
     seed=42,
     learning_rate=5e-5,
@@ -157,7 +175,7 @@ CONFIGS = {
     'mrc': MRC_ALL_CONTEXT_CONFIG,
     'dp': DP_CONFIG,
     'multitask': MULTITASK_CONFIG_1,
-    'vinca': MRC_ALL_CONTEXT_CONFIG,
+    'vinca': VINCA_CONFIG,
 }
 
 
