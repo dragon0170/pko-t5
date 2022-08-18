@@ -15,7 +15,7 @@ from .utils import contains_as_sublist
 
 class VincaProcessor:
     def __init__(self, tokenizer):
-        file_path = "vinca_place_dataset_220811.json"
+        file_path = "vinca_place_dataset_220818_split.json"
 
         with open(file_path, 'r') as file:
             data = json.load(file)
@@ -76,8 +76,8 @@ class VincaProcessor:
     def _compute_metrics(self, output_texts: List[str], entries: List[Dict[str, any]]) -> Dict[str, float]:
         references, predictions = [], []
         for output_text, row in zip(output_texts, entries):
-            predictions.append({'prediction_text': output_text, 'id': row['paragraphs'][0]['qas'][0]['id']})
-            references.append({'answers': {"answer_start": [0], "text": [answer["text"] for answer in row['paragraphs'][0]['qas'][0]['answers']]}, 'id': row['paragraphs'][0]['qas'][0]['id']})
+            predictions.append({'prediction_text': output_text, 'id': row['paragraphs'][0]['search_engine'] + row['paragraphs'][0]['qas'][0]['id']})
+            references.append({'answers': {"answer_start": [0], "text": [answer["text"] for answer in row['paragraphs'][0]['qas'][0]['answers']]}, 'id': row['paragraphs'][0]['search_engine'] + row['paragraphs'][0]['qas'][0]['id']})
         results = self.squad_metric.compute(predictions=predictions, references=references)
 
         return {"exact_match": results['exact_match'], 'f1': results['f1']}
