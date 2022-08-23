@@ -97,7 +97,8 @@ def train(model="./models/t5-kr-small-bbpe", task='ynat', max_length=1300):
     # TODO: 학습 진행 후 test set score 저장
     kf = KFold(n_splits=10)
     i = 0
-    for train_data, dev_data in kf.split(processor.process('train')):
+    processed_data = processor.process('train')
+    for train_index, dev_index in kf.split(processed_data):
         args = Seq2SeqTrainingArguments(
             output_dir=f'{output_dir}/{i}',
             local_rank=local_rank,
@@ -106,8 +107,8 @@ def train(model="./models/t5-kr-small-bbpe", task='ynat', max_length=1300):
 
         model = T5ForConditionalGeneration.from_pretrained(model_name_or_path)
 
-        train_data = Text2TextDataset(train_data, max_length=max_length)
-        dev_data = Text2TextDataset(dev_data, max_length=max_length)
+        train_data = Text2TextDataset(processed_data[train_index], max_length=max_length)
+        dev_data = Text2TextDataset(processed_data[dev_index], max_length=max_length)
         data_collator = DataCollatorForSeq2Seq(tokenizer, model, padding=True)
 
         metrics = Metrics(
