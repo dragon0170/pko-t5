@@ -15,13 +15,19 @@ from .utils import contains_as_sublist
 
 class VincaProcessor:
     def __init__(self, tokenizer):
-        file_path = "vinca_place_dataset_220818_split.json"
+        train_file_path = "vinca_place_dataset_220822_train.json"
+        test_file_path = "vinca_place_dataset_220822_test.json"
 
-        with open(file_path, 'r') as file:
-            data = json.load(file)
-            print("dataset version: ", data["version"])
-            print("dataset length: ", len(data["data"]))
-        self.data = data["data"]
+        with open(train_file_path, 'r') as train_file:
+            train_data = json.load(train_file)
+            print("train dataset version: ", train_data["version"])
+            print("train dataset length: ", len(train_data["data"]))
+        self.train_data = train_data["data"]
+        with open(test_file_path, 'r') as test_file:
+            test_data = json.load(test_file)
+            print("train dataset version: ", test_data["version"])
+            print("train dataset length: ", len(test_data["data"]))
+        self.test_data = test_data["data"]
         self.tokenizer = tokenizer
         self.squad_metric = datasets.load_metric('squad')
 
@@ -32,9 +38,9 @@ class VincaProcessor:
     def process(self, split_name):
         dataset = []
         if split_name == "train":
-            dataset = self.data[:-10]
-        if split_name == "validation":
-            dataset = self.data[-10:]
+            dataset = self.train_data
+        if split_name == "test":
+            dataset = self.test_data
 
         input_texts, target_texts = self._process_t2t(dataset)
         input_ids = self.tokenizer(input_texts, add_special_tokens=True).input_ids

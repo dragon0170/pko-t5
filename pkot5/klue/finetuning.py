@@ -18,6 +18,7 @@ from transformers import (
     TrainerState,
     TrainerControl,
 )
+from sklearn.model_selection import KFold
 
 from .args import get_config
 from .collators import DistributedSamplerForEval
@@ -55,7 +56,7 @@ class Metrics(TrainerCallback):
                 return_dict_in_generate=True,
             )
             logits = output.sequences
-            if self.processor.task == 'mrc':
+            if self.processor.task == 'mrc' or self.processor.task == 'vinca':
                 all_scores += output.sequences_scores.tolist()
             assert logits.shape[0] == data['input_ids'].shape[0]
             logits = logits.detach().cpu().tolist()
@@ -77,60 +78,70 @@ class Metrics(TrainerCallback):
 
 def train(model="./models/t5-kr-small-bbpe", task='ynat', max_length=1300):
     print(f"Start training \'{task}\' task")
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
     model_name_or_path = model
+    output_dir = './models/klue_t5'
     local_rank = int(os.getenv("LOCAL_RANK", "-1"))
-    args = Seq2SeqTrainingArguments(
-        output_dir='./models/klue_t5',
-        local_rank=local_rank,
-        **get_config(task)
-    )
 
     r = redis.Redis(
         host='localhost',
         port=6379)
 
     tokenizer = PreTrainedTokenizerFast.from_pretrained(model_name_or_path)
-    model = T5ForConditionalGeneration.from_pretrained(model_name_or_path)
 
     if task == "vinca":
         processor = VincaProcessor(tokenizer)
     else:
         processor = KLUE_PROCESSORS[task](tokenizer)
 
-    train_data = Text2TextDataset(processor.process('train'), max_length=max_length)
-    dev_data = Text2TextDataset(processor.process('validation'), max_length=max_length)
-    data_collator = DataCollatorForSeq2Seq(tokenizer, model, padding=True)
+    # TODO: 학습 진행 후 test set score 저장
+    kf = KFold(n_splits=10)
+    i = 0
+    for train_data, dev_data in kf.split(processor.process('train')):
+        args = Seq2SeqTrainingArguments(
+            output_dir=f'{output_dir}/{i}',
+            local_rank=local_rank,
+            **get_config(task)
+        )
 
-    metrics = Metrics(
-        processor,
-        r=r,
-        test_data=dev_data,
-        data_collator=data_collator,
-        max_length=max_length
-    )
-    trainer = Seq2SeqTrainer(
-        model=model,
-        args=args,
-        data_collator=data_collator,
-        train_dataset=train_data,
-        eval_dataset=dev_data,
-        tokenizer=tokenizer,
-        callbacks=[metrics],
-    )
+        model = T5ForConditionalGeneration.from_pretrained(model_name_or_path)
 
-    trainer.train()
+        train_data = Text2TextDataset(train_data, max_length=max_length)
+        dev_data = Text2TextDataset(dev_data, max_length=max_length)
+        data_collator = DataCollatorForSeq2Seq(tokenizer, model, padding=True)
 
-    best_metric = None
-    for metric in metrics.metrics:
-        if best_metric is None:
-            best_metric = metric
-        elif any(metric[k] >= best_metric[k] for k in best_metric.keys()):
-            best_metric = metric
+        metrics = Metrics(
+            processor,
+            r=r,
+            test_data=dev_data,
+            data_collator=data_collator,
+            max_length=max_length
+        )
+        trainer = Seq2SeqTrainer(
+            model=model,
+            args=args,
+            data_collator=data_collator,
+            train_dataset=train_data,
+            eval_dataset=dev_data,
+            tokenizer=tokenizer,
+            callbacks=[metrics],
+        )
 
-    if local_rank == 0:
-        with open(f'{model_name_or_path}/result_{task}.txt', 'wt') as f:
-            for k, v in best_metric.items():
-                f.write(f"{k}={v}\n")
+        trainer.train()
+        trainer.save_model(output_dir=f'{output_dir}/{i}')
+
+        best_metric = None
+        for metric in metrics.metrics:
+            if best_metric is None:
+                best_metric = metric
+            elif any(metric[k] >= best_metric[k] for k in best_metric.keys()):
+                best_metric = metric
+
+        if local_rank == 0:
+            with open(f'{output_dir}/{i}/result_{task}.txt', 'wt') as f:
+                for k, v in best_metric.items():
+                    f.write(f"{k}={v}\n")
+        i += 1
 
 
 if __name__ == '__main__':
