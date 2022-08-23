@@ -107,8 +107,8 @@ def train(model="./models/t5-kr-small-bbpe", task='ynat', max_length=1300):
 
         model = T5ForConditionalGeneration.from_pretrained(model_name_or_path)
 
-        train_data = Text2TextDataset(processed_data[train_index], max_length=max_length)
-        dev_data = Text2TextDataset(processed_data[dev_index], max_length=max_length)
+        train_data = Text2TextDataset([processed_data[i] for i in train_index], max_length=max_length)
+        dev_data = Text2TextDataset([processed_data[i] for i in dev_index], max_length=max_length)
         data_collator = DataCollatorForSeq2Seq(tokenizer, model, padding=True)
 
         metrics = Metrics(
