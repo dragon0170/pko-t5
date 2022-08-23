@@ -172,6 +172,7 @@ def evaluate(model="./models/t5-kr-small-bbpe", task='ynat', max_length=1300):
     )
 
     model.eval()
+    model.to('cuda:0')
     all_scores, all_logits = [], []
     eval_dataloader = DataLoader(
         test_data,
