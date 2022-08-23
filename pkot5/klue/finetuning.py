@@ -166,6 +166,7 @@ def evaluate(model="./models/t5-kr-small-bbpe", task='ynat', max_length=1300):
     data_collator = DataCollatorForSeq2Seq(tokenizer, model, padding=True)
 
     args = Seq2SeqTrainingArguments(
+        output_dir="./models",
         local_rank=local_rank,
         **get_config(task)
     )
