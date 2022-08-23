@@ -94,7 +94,6 @@ def train(model="./models/t5-kr-small-bbpe", task='ynat', max_length=1300):
     else:
         processor = KLUE_PROCESSORS[task](tokenizer)
 
-    # TODO: 학습 진행 후 test set score 저장
     kf = KFold(n_splits=10)
     i = 0
     processed_data = processor.process('train')
@@ -145,5 +144,71 @@ def train(model="./models/t5-kr-small-bbpe", task='ynat', max_length=1300):
         i += 1
 
 
+def evaluate(model="./models/t5-kr-small-bbpe", task='ynat', max_length=1300):
+    print(f"Start training \'{task}\' task")
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+    model_name_or_path = model
+    local_rank = int(os.getenv("LOCAL_RANK", "-1"))
+
+    r = redis.Redis(
+        host='localhost',
+        port=6379)
+
+    tokenizer = PreTrainedTokenizerFast.from_pretrained(model_name_or_path)
+
+    if task == "vinca":
+        processor = VincaProcessor(tokenizer)
+    else:
+        processor = KLUE_PROCESSORS[task](tokenizer)
+
+    model = T5ForConditionalGeneration.from_pretrained(model_name_or_path)
+    test_data = Text2TextDataset(processor.process('test'), max_length=max_length)
+    data_collator = DataCollatorForSeq2Seq(tokenizer, model, padding=True)
+
+    args = Seq2SeqTrainingArguments(
+        local_rank=local_rank,
+        **get_config(task)
+    )
+
+    model.eval()
+    all_scores, all_logits = [], []
+    eval_dataloader = DataLoader(
+        test_data,
+        batch_size=args.per_device_eval_batch_size,
+        sampler=DistributedSamplerForEval(test_data),
+        collate_fn=data_collator
+    )
+    print("Start evaluation")
+    for data in tqdm(eval_dataloader, desc="Eval.."):
+        output = model.generate(
+            input_ids=data['input_ids'].cuda(),
+            attention_mask=data['attention_mask'].cuda(),
+            num_beams=args.generation_num_beams,
+            max_length=args.generation_max_length,
+            early_stopping=True,
+            output_scores=True,
+            return_dict_in_generate=True,
+        )
+        logits = output.sequences
+        if processor.task == 'mrc' or processor.task == 'vinca':
+            all_scores += output.sequences_scores.tolist()
+        assert logits.shape[0] == data['input_ids'].shape[0]
+        logits = logits.detach().cpu().tolist()
+        all_logits += logits
+
+    r.set(f"{dist.get_rank()}", pickle.dumps([all_logits, all_scores]))
+    dist.barrier()
+    all_scores, all_logits = [], []
+    for i in range(dist.get_world_size()):
+        logits, scores = pickle.loads(r.get(f"{i}"))
+        all_logits += logits
+        all_scores += scores
+    if len(all_scores) == 0:
+        all_scores = None
+    metric = processor.compute_metrics(all_logits, test_data.entries, output_scores=all_scores)
+    print(metric)
+
+
 if __name__ == '__main__':
-    fire.Fire(train)
+    # fire.Fire(train)
+    fire.Fire(evaluate)
