@@ -15,7 +15,7 @@ from .utils import contains_as_sublist
 
 class VincaProcessor:
     def __init__(self, tokenizer):
-        train_file_path = "vinca_place_dataset_220822_train.json"
+        train_file_path = "vinca_place_dataset_220829_split.json"
         test_file_path = "vinca_place_dataset_220822_test.json"
 
         with open(train_file_path, 'r') as train_file:

@@ -98,6 +98,7 @@ def train(model="./models/t5-kr-small-bbpe", task='ynat', max_length=1300):
     i = 0
     processed_data = processor.process('train')
     for train_index, dev_index in kf.split(processed_data):
+        print(f"{i} model - dev_index[0]: {dev_index[0]}, dev_index[last]: {dev_index[len(dev_index)-1]}")
         args = Seq2SeqTrainingArguments(
             output_dir=f'{output_dir}/{i}',
             local_rank=local_rank,
@@ -212,5 +213,5 @@ def evaluate(model="./models/t5-kr-small-bbpe", task='ynat', max_length=1300):
 
 
 if __name__ == '__main__':
-    # fire.Fire(train)
-    fire.Fire(evaluate)
+    fire.Fire(train)
+    # fire.Fire(evaluate)
