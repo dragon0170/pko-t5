@@ -16,7 +16,7 @@ from .utils import contains_as_sublist
 class VincaProcessor:
     def __init__(self, tokenizer):
         train_file_path = "vinca_place_dataset_220829_split.json"
-        test_file_path = "vinca_place_dataset_220822_test.json"
+        test_file_path = "vinca_place_dataset_220829_test.json"
 
         with open(train_file_path, 'r') as train_file:
             train_data = json.load(train_file)
@@ -82,6 +82,8 @@ class VincaProcessor:
     def _compute_metrics(self, output_texts: List[str], entries: List[Dict[str, any]]) -> Dict[str, float]:
         references, predictions = [], []
         for output_text, row in zip(output_texts, entries):
+            if output_text != row['paragraphs'][0]['qas'][0]['answers'][0]['text']:
+                print(f"question: {row['paragraphs'][0]['qas'][0]['question']}\ncontext: {row['paragraphs'][0]['context']}\nexpected_answer: {row['paragraphs'][0]['qas'][0]['answers'][0]['text']}\npredicted_answer: {output_text}")
             predictions.append({'prediction_text': output_text, 'id': row['paragraphs'][0]['search_engine'] + row['paragraphs'][0]['qas'][0]['id']})
             references.append({'answers': {"answer_start": [0], "text": [answer["text"] for answer in row['paragraphs'][0]['qas'][0]['answers']]}, 'id': row['paragraphs'][0]['search_engine'] + row['paragraphs'][0]['qas'][0]['id']})
         results = self.squad_metric.compute(predictions=predictions, references=references)

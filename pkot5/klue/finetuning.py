@@ -213,5 +213,5 @@ def evaluate(model="./models/t5-kr-small-bbpe", task='ynat', max_length=1300):
 
 
 if __name__ == '__main__':
-    fire.Fire(train)
-    # fire.Fire(evaluate)
+    # fire.Fire(train)
+    fire.Fire(evaluate)
